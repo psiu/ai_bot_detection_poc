@@ -79,7 +79,7 @@ async def run_chat_loop():
             """
 
             chat = client.chats.create(
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.5-flash",
                 config=types.GenerateContentConfig(
                     system_instruction=sys_instruct,
                     tools=gemini_tools,

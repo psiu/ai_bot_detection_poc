@@ -5,3 +5,4 @@ venv/
 .env
 *.db
 crash.log
+BD_backup.env

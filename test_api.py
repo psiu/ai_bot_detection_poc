@@ -18,7 +18,7 @@ def test_api():
     print("Sending a simple 'Hello' request...")
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             contents="Hello, are you online?"
         )
         print("\nSuccess! API Responded:")

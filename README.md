@@ -1,7 +1,7 @@
 # Social Media Bot Detection Agent (PoC)
 
 ## Overview
-This Proof of Concept (PoC) demonstrates a **Fraud Detection Agent** that identifies bot attacks on social media platforms. It uses **Google Gemini 2.0 Flash** combined with the **Model Context Protocol (MCP)** to give the AI direct access to database forensics tools.
+This Proof of Concept (PoC) demonstrates a **Fraud Detection Agent** that identifies bot attacks on social media platforms. It uses **Google Gemini 2.5 Flash** combined with the **Model Context Protocol (MCP)** to give the AI direct access to database forensics tools.
 
 ## Architecture
 - **Agent**: `client.py` (Gemini-powered interactive forensic analyst).

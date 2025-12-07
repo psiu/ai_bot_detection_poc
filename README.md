@@ -1,59 +1,59 @@
-# Social Media Bot Detection Agent (PoC)
+# Social Media Fraud Detection Agent (PoC)
 
 ## Overview
-This Proof of Concept (PoC) demonstrates a **Fraud Detection Agent** that identifies bot attacks on social media platforms. It uses **Google Gemini 2.5 Flash** combined with the **Model Context Protocol (MCP)** to give the AI direct access to database forensics tools.
+This is an advanced **AI-Powered Forensics Dashboard** designed to detect and analyze social media bot networks. It combines a **FastAPI/SQLite backend** with a **React Frontend** and a **Gemini 2.5 Flash Agent** to provide autonomous investigation capabilities.
 
-## Architecture
-- **Agent**: `client.py` (Gemini-powered interactive forensic analyst).
-- **Server**: `server.py` (FastMCP server connecting to SQLite).
-- **Database**: `social_media_logs.db` (Generated mock data with embedded "bot attacks").
+## Key Features
+### 🕵️ Autonmous Agent
+- **Self-Correcting Investigator**: Can investigate vague queries like "What happened during the spike?" by autonomously checking video stats first.
+- **Tools**: `get_video_stats` (Peak Detection), `run_read_only_sql` (Generic Queries), `fetch_suspicious_users`.
 
-## Features
-- **Data Generation**: creates a realistic mix of organic traffic and coordinated bot attacks (Fresh Bots & Sleeper Bots).
-- **Tool Logic**:
-    - `get_video_stats`: Fetch metadata and total likes.
-    - `analyze_hourly_spike`: Detects unnatural traffic spikes compared to neighboring hours.
-    - `fetch_suspicious_users`: Lists users involved in a spike and flags suspicious account ages.
+### 📊 Forensics Dashboard (React)
+- **User Risk Explorer**: Sortable list of flagged users with "Alert Reasons" (e.g., *Spike Participation*).
+- **Interactive Charts**: Click on any data point in the activity graph to drill down into that specific hour's traffic.
+- **Rich User Profiles**: Modals displaying simulated Bio, Location, Avatar, and a **Risk Narrative** explaining why the user was flagged.
 
-## Setup
+### 🛡️ Detection Logic
+- **Fresh Bots**: Accounts < 48h old with high velocity.
+- **Sleeper Bots**: Old accounts dormant for > 90 days that suddenly activate during an attack.
+- **Spike Analysis**: Statistical anomaly detection on hourly traffic.
 
-1.  **Prerequisites**:
-    - Python 3.10+
-    - Google API Key (with Gemini access)
+## Tech Stack
+- **Frontend**: React (Vite), Chart.js, Lucide Icons.
+- **Backend**: Python FastAPI, SQLite.
+- **AI**: Google Gemini 2.5 Flash (via `google-genai` SDK).
 
-2.  **Install**:
-    ```powershell
-    python -m venv venv
-    .\venv\Scripts\activate
-    pip install mcp google-genai python-dotenv
-    ```
+## Setup & Run
 
-3.  **Configure**:
-    Create a `.env` file in the root directory:
+1.  **Environment**:
+    Create a `.env` file:
     ```env
-    GOOGLE_API_KEY=your_api_key_here
+    GOOGLE_API_KEY=your_gemini_api_key
     ```
 
-4.  **Generate Data**:
+2.  **Install Dependencies**:
+    ```powershell
+    # Backend
+    pip install fastapi uvicorn google-genai python-dotenv asyncio
+
+    # Frontend (in /web_app)
+    cd web_app
+    npm install
+    ```
+
+3.  **Generate Data**:
     ```powershell
     python data_gen.py
     ```
-    *This creates `social_media_logs.db` with a bot attack simulated on Video #20.*
 
-## Usage
+4.  **Launch System**:
+    *   **Backend**: `python web_server.py` (Runs on port 8000)
+    *   **Frontend**: `npm run dev` (Runs on port 5173)
 
-Run the agent:
-```powershell
-python client.py
-```
-
-**Example Scenario**:
-> **User**: "Investigate video 20 for suspicious activity yesterday at 14:00"
->
-> **Agent**: *Analyzing spike... Found 150 likes. 100% of users are <24h old. This is a Bot Attack.*
+5.  **Access**: Open `http://localhost:5173` in your browser.
 
 ## Project Structure
-- `client.py`: Main entry point. Handles rate limiting and Gemini API interaction.
-- `server.py`: Defines the forensics tools available to the agent.
-- `data_gen.py`: Setup script to populates the database.
-- `test_api.py`: Utility to verify API key connectivity.
+- `web_server.py`: Main FastAPI application and Agent definition.
+- `data_gen.py`: Generates the mock database with organic vs. bot traffic.
+- `web_app/`: Source code for the React dashboard.
+

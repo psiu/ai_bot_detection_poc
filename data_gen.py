@@ -1,148 +1,165 @@
 import sqlite3
 import random
-import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 DB_NAME = "social_media_logs.db"
 
-def create_connection():
+def create_db():
     conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS likes")
+    c.execute("DROP TABLE IF EXISTS videos")
+    c.execute("DROP TABLE IF EXISTS users")
+    
+    c.execute("""CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        username TEXT,
+        created_at TEXT, -- ISO format
+        is_bot BOOLEAN
+    )""")
+    
+    c.execute("""CREATE TABLE videos (
+        id INTEGER PRIMARY KEY,
+        title TEXT,
+        upload_date TEXT,
+        archetype TEXT -- 'viral', 'flop', 'steady', 'dead'
+    )""")
+    
+    c.execute("""CREATE TABLE likes (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER,
+        video_id INTEGER,
+        timestamp TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(video_id) REFERENCES videos(id)
+    )""")
+    conn.commit()
     return conn
 
-def create_tables(conn):
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            created_at TIMESTAMP NOT NULL,
-            is_bot BOOLEAN DEFAULT 0
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS videos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            upload_date TIMESTAMP NOT NULL
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS likes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            video_id INTEGER NOT NULL,
-            timestamp TIMESTAMP NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (video_id) REFERENCES videos (id)
-        )
-    ''')
-    conn.commit()
-
-def generate_organic_data(conn):
+def generate_data():
+    conn = create_db()
     cursor = conn.cursor()
     
-    # 1. Create Users (Organic)
-    print("Generating organic users...")
-    start_date = datetime.datetime.now() - timedelta(days=730) # 2 years ago
+    print("Generating Users...")
     users = []
-    for i in range(100):
-        created_at = start_date + timedelta(days=random.randint(0, 700))
-        users.append((f"user_{i}", created_at, False))
+    # 1000 Organic Users (Created over last 2 years)
+    start_date = datetime.now(timezone.utc) - timedelta(days=730)
+    for i in range(1000):
+        created = start_date + timedelta(days=random.randint(0, 700))
+        users.append((f"user_{random.randint(10000, 99999)}", created.isoformat(), False))
     
+    # 300 Sleeper Bots (Old accounts, inactive until attack)
+    for i in range(300):
+        created = start_date + timedelta(days=random.randint(0, 365))
+        # Anonymized: looks like normal user
+        users.append((f"user_{random.randint(10000, 99999)}", created.isoformat(), True))
+
+    # 200 Fresh Bots (Created very recently, < 48 hours ago)
+    recent_start = datetime.now(timezone.utc) - timedelta(hours=48)
+    for i in range(200):
+        created = recent_start + timedelta(minutes=random.randint(0, 2800))
+        # Anonymized
+        users.append((f"user_{random.randint(10000, 99999)}", created.isoformat(), True))
+
     cursor.executemany("INSERT INTO users (username, created_at, is_bot) VALUES (?, ?, ?)", users)
     
-    # 2. Create Videos
-    print("Generating videos...")
+    # Need to keep track of organic vs bot IDs for like generation?
+    # IDs are auto-increment.
+    # 1-1000: Organic
+    # 1001-1300: Sleepers
+    # 1301-1500: Fresh
+    # This assumption holds because of insertion order.
+    
+    print("Generating Videos...")
     videos = []
+    archetypes = ['viral', 'flop', 'steady', 'dead']
+    # 50 Videos uploaded in last 6 months
+    vid_start = datetime.now(timezone.utc) - timedelta(days=180)
+    
     for i in range(50):
-        upload_date = start_date + timedelta(days=random.randint(0, 600))
-        videos.append((f"Video Title {i}", upload_date))
-    
-    cursor.executemany("INSERT INTO videos (title, upload_date) VALUES (?, ?)", videos)
-    
-    # 3. Generate Organic Likes
-    print("Generating organic likes...")
-    cursor.execute("SELECT id, created_at FROM users WHERE is_bot = 0")
-    user_rows = cursor.fetchall()
-    cursor.execute("SELECT id, upload_date FROM videos")
-    video_rows = cursor.fetchall()
-    
+        upload = vid_start + timedelta(days=random.randint(0, 170))
+        atype = random.choices(archetypes, weights=[10, 20, 40, 30])[0]
+        # Make Video 20 specifically the attack target, steady usually
+        if i == 20: atype = 'steady' 
+        
+        videos.append((i, f"Video Title {i} ({atype})", upload.isoformat(), atype))
+        
+    cursor.executemany("INSERT INTO videos (id, title, upload_date, archetype) VALUES (?, ?, ?, ?)", videos)
+
+    print("Generating Likes (Attributes-based)...")
     likes = []
-    for u_id, u_created in user_rows:
-        # Each organic user likes 5-20 videos
-        num_likes = random.randint(5, 20)
-        u_created_dt = datetime.datetime.fromisoformat(str(u_created))
+    
+    # Simulation Window: Last 6 months
+    # We iterate by hour? No, that's too slow.
+    # We iterate by video and generate based on its curve.
+    
+    for vid_id, title, upload_str, atype in videos:
+        upload_dt = datetime.fromisoformat(upload_str)
+        now = datetime.now(timezone.utc)
+        days_live = (now - upload_dt).days
+        if days_live < 0: continue
         
-        for _ in range(num_likes):
-            v_id, v_upload = random.choice(video_rows)
-            v_upload_dt = datetime.datetime.fromisoformat(str(v_upload))
+        # Determine total organic likes based on archetype
+        organic_volume = 0
+        if atype == 'viral': organic_volume = random.randint(500, 2000)
+        elif atype == 'steady': organic_volume = random.randint(100, 500)
+        elif atype == 'flop': organic_volume = random.randint(50, 200)
+        else: organic_volume = random.randint(0, 20)
+        
+        # Distribute likes
+        for _ in range(organic_volume):
+            # Choose a user (mostly organic)
+            uid = random.randint(1, 1000) # Organic users are 1-1000
             
-            # Like must be after user creation and video upload
-            min_time = max(u_created_dt, v_upload_dt)
-            if min_time > datetime.datetime.now(): continue
+            # Time distribution
+            delay_days = 0
+            if atype == 'viral':
+                # Viral: Slow start, huge spike, long tail
+                # Simplified: Gamma-ish distribution
+                delay_days = int(random.gammavariate(2, 5))
+            elif atype == 'flop':
+                # Flop: Huge start, effectively zero after 3 days
+                delay_days = int(random.gammavariate(1, 1))
+            elif atype == 'steady':
+                # Steady: Uniform-ish over time
+                delay_days = random.randint(0, days_live if days_live > 0 else 0)
+            else:
+                delay_days = random.randint(0, 10)
+
+            if delay_days > days_live: delay_days = days_live
             
-            # Simple random time between min_time and now
-            delta_seconds = int((datetime.datetime.now() - min_time).total_seconds())
-            if delta_seconds <= 0: continue
-            
-            like_time = min_time + timedelta(seconds=random.randint(0, delta_seconds))
-            likes.append((u_id, v_id, like_time))
-            
+            # Add random hour
+            like_time = upload_dt + timedelta(days=delay_days, hours=random.randint(0,23), minutes=random.randint(0,59))
+            likes.append((uid, vid_id, like_time.isoformat()))
+
+    # --- SIMULATE ATTACK ---
+    # Target: Video 20
+    # Time: Yesterday at 14:00
+    target_vid = 20
+    attack_time_base = datetime.now(timezone.utc) - timedelta(days=1)
+    attack_time_base = attack_time_base.replace(hour=14, minute=0, second=0, microsecond=0)
+    
+    print(f"Injecting Bot Attack on Video {target_vid} at {attack_time_base.isoformat()}...")
+    
+    # Attackers: 200 Fresh Bots + 100 Sleepers
+    # IDs: Fresh (1301-1500), Sleepers (1001-1300) -> Wait, user IDs are auto-assigned.
+    # Organic: 1-1000. Sleepers: 1001-1300. Fresh: 1301-1500.
+    
+    attackers = list(range(1001, 1500)) # All bots
+    random.shuffle(attackers)
+    
+    for uid in attackers:
+        # Tightly clustered around 14:00 - 14:15
+        offset = timedelta(minutes=random.randint(0, 15), seconds=random.randint(0, 59))
+        ts = attack_time_base + offset
+        likes.append((uid, target_vid, ts.isoformat()))
+        
+    print(f"Total Likes Generated: {len(likes)}")
     cursor.executemany("INSERT INTO likes (user_id, video_id, timestamp) VALUES (?, ?, ?)", likes)
+    
     conn.commit()
-
-def generate_bot_attack(conn):
-    cursor = conn.cursor()
-    print("Generating bot attack...")
-    
-    target_video_id = 20
-    # Attack time: Yesterday at 14:00
-    yesterday_1400 = (datetime.datetime.now() - timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0)
-    
-    # Ensure video 20 exists with a compatible upload date, or update it
-    # We'll just update video 20 to exist and be uploaded before attack
-    cursor.execute("INSERT OR IGNORE INTO videos (id, title, upload_date) VALUES (20, 'Target Video', ?)", 
-                   (yesterday_1400 - timedelta(days=10),))
-    # If it existed, update upload date to be safe
-    cursor.execute("UPDATE videos SET upload_date = ? WHERE id = 20", (yesterday_1400 - timedelta(days=10),))
-
-    bots = []
-    bot_likes = []
-    
-    # 1. Fresh Bots (< 24h old)
-    # Created shortly before attack
-    for i in range(100): # 100 Fresh bots
-        created_at = yesterday_1400 - timedelta(hours=random.randint(1, 12))
-        bots.append((f"fresh_bot_{i}", created_at, True))
-    
-    # 2. Sleeper Bots (> 3 months old)
-    for i in range(50): # 50 Sleeper bots
-        created_at = yesterday_1400 - timedelta(days=random.randint(100, 300))
-        bots.append((f"sleeper_bot_{i}", created_at, True))
-        
-    cursor.executemany("INSERT INTO users (username, created_at, is_bot) VALUES (?, ?, ?)", bots)
-    
-    # Get IDs of just inserted bots (assuming they are at the end)
-    # A safer way is to select them back
-    cursor.execute("SELECT id, created_at FROM users WHERE is_bot = 1")
-    all_bots = cursor.fetchall()
-    
-    for b_id, b_created in all_bots:
-        # All of them like the target video around 14:00 (+- 30 mins)
-        offset_minutes = random.randint(-15, 45) # Skew slightly after 14:00
-        like_time = yesterday_1400 + timedelta(minutes=offset_minutes)
-        bot_likes.append((b_id, target_video_id, like_time))
-        
-    cursor.executemany("INSERT INTO likes (user_id, video_id, timestamp) VALUES (?, ?, ?)", bot_likes)
-    conn.commit()
-
-def main():
-    conn = create_connection()
-    create_tables(conn)
-    generate_organic_data(conn)
-    generate_bot_attack(conn)
     conn.close()
     print("Database generation complete.")
 
 if __name__ == "__main__":
-    main()
+    generate_data()
